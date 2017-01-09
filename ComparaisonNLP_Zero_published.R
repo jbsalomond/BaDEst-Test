@@ -5,18 +5,9 @@ sigma = 1
 
 
 
-
-lBF_JR = function(x,n){ 
-  .5*log(sigma) + .5*(x^2)*(n^2)/(1/sigma + n) - 0.5*log(1/sigma + n)
-  log( (n*x)^2/(1/sigma + n)^2  + 1/(1/sigma + n) )
-}
-
-library(mombf)
-
-lBF_RT = function(x,n){
-  fitlm = lm(x~1)
-  mombf(fitlm,coef = c(1),g = c(0.358),logbf = 1)
-  
+lBF_JR = function(x,n){
+  tau = 0.358
+  0.5*n*x^2*(1+1/(1/tau^2+n)) - 0.5*log(1 + n*tau^2) + log(1/(1/tau^2 + n) + (n*x/(1/tau^2 + n))^2 )
 }
 
 
