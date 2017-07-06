@@ -5,11 +5,11 @@ sigma = 1
 
 
 
+
 lBF_JR = function(x,n){
-  tau = 0.358
+  tau = 1/sqrt(n)
   0.5*n*x^2*(1+1/(1/tau^2+n)) - 0.5*log(1 + n*tau^2) + log(1/(1/tau^2 + n) + (n*x/(1/tau^2 + n))^2 )
 }
-
 
 Stest = function(x,n){
   v = max((log(log(n))),1.96) #sqrt(log(n)/2)

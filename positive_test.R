@@ -2,7 +2,6 @@ library(dplyr)
 library(MASS)
 library(invgamma)
 library(pbapply)
-source("./functions.R")
 library(parallel)
 cl = cl <- makeCluster(10)
 clusterExport(cl, ls())
@@ -12,12 +11,7 @@ clusterEvalQ(cl, library(invgamma))
 clusterEvalQ(cl, library(pbapply))
 # Function H 
 H = function(omega){
-  k = length(omega)
-  temp = rep(0,k)
-  for(i in 2:k){
-    temp[i] = max(omega[i] - omega[1:i])
-  }
-  return(max(temp))
+ (- min(omega))
 }
 
 # sampling k 
@@ -45,12 +39,9 @@ sampleK00 = function(x,y,prior,alpha,beta,mu,lambda,Kmax,Nk){
   kliste = seq(2,Kmax)
   logpik = sapply(X = kliste,FUN = Cxk,
                   x = x,y = y,prior = prior,alpha = alpha,beta = beta,mu = mu,lambda = lambda)
-  center = logpik - max(logpik)
-  #print(center)
-  pik = exp(center)/sum(exp(center))
+  pik = exp(logpik)/sum(exp(logpik))
   sample(2:Kmax,prob = pik,replace = T,size = Nk)
 }
-
 
 
 sampleK = function(x,y,prior,alpha,beta,mu,lambda,Kmax,Nk){
@@ -74,6 +65,9 @@ sampleK = function(x,y,prior,alpha,beta,mu,lambda,Kmax,Nk){
   pik = exp(center)/sum(exp(center))
   sample(2:i,prob = pik,replace = T,size = Nk)
 }
+
+
+
 
 
 test = function(x,y,prior,alpha,beta,mu,lambda,Kmax,Nk,M0,verbose=F,autoM0 = F){
@@ -103,10 +97,14 @@ test = function(x,y,prior,alpha,beta,mu,lambda,Kmax,Nk,M0,verbose=F,autoM0 = F){
     
     for(l in 1:nj){
       if(autoM0) tau = 2*M0*sqrt(log(n/j))*(sqrt(j*median(sigma)/(n+j*mu)))
-      else tau = (M0*sqrt(j*sigma*log(n)/(n)))
+      else tau = (M0*sqrt(j*median(sigma)*log(n)/(n)))
       postmean = Yi
       postvar = sigma[l]/(ni + mu)
       omega = rnorm(n = j, m = postmean,sd = sqrt(postvar))
+      #print(j)
+      #print(omega)
+      #print(H(omega))
+      #print(tau)
       outk[l] = H(omega)>tau
     }
     out[i] = sum(outk)
@@ -114,31 +112,33 @@ test = function(x,y,prior,alpha,beta,mu,lambda,Kmax,Nk,M0,verbose=F,autoM0 = F){
   return(sum(out)/Nk>=0.5)
 }
 
-calM0f = function(x,n,k) {
-  pnorm(-x + 2*sqrt(log(n/k))) + 1 - pnorm(x - 2*sqrt(log(n/k))) - (1/2)^(1/k)
+
+run = function(n,sd = 0.1,verbose = T,autoM0 = F,prior = "geom",lambda = 0.4,M0=1,mu=1,Kmax=100){
+sd = 0.1
+
+ro = 6*(log(n)/n)^(1/3)
+f = function(x){
+  ro*(abs(x-0.5)-0.1)*(abs(x-0.5)<0.1)
 }
 
-flist = c(g1,g2,g3,g4,g5,g6,g7,g8,g9,g10,g11,f1,f2,f3,f4,f5,f6,f7,f04,f05)
-namesf = c("g1","g2","g3","g4","g5","g6","g7","g8","g9","g10","g11","f1","f2","f3","f4","f5","f6","f7","f04","f05")
-
-run = function(f,n,sd = 0.1,verbose = F,autoM0 = F,prior,lambda,M0,mu){
-  X = seq(0,1,length = n+1)[-(n+1)]
-  y = f(X) + rnorm(n,sd = sd)
-  return(test(X,y,prior,alpha = 100, beta = .5,mu = mu,lambda = lambda,Kmax= n-1,Nk = 2500,M0 = M0,verbose = verbose,autoM0 = autoM0) ) 
+X = seq(0,1,length = n+1)[-(n+1)]
+y = f(X) + rnorm(n,sd = sd)
+return(test(X,y,prior,alpha = 100, beta = .5,mu = mu,lambda = lambda,Kmax= Kmax,Nk = 2500,M0 = M0,verbose = verbose,autoM0 = autoM0) ) 
 }
 
-flist = c(g1,g2,g3,g4,g5,g6,g7,g8,g9,g10,g11,f1,f2,f3,f4,f5,f6,f7,f04,f05)
-namesf = c("g1","g2","g3","g4","g5","g6","g7","g8","g9","g10","g11",
-           "f1","f2","f3","f4","f5","f6","f7","f04","f05")
+positive = function(spsize){
+mean(replicate(run(n = spsize,
+                   verbose = F,prior = "geom",lambda = .4,M0 = 1,mu = 1,autoM0 = T),n = 250))
+}
+
+positive(100)
+
+nlist = c(100,250,500,1000,2500)
+
 
 clusterExport(cl, ls())
 start.time = proc.time()
-resutl <- parLapply(cl,flist,function(f){
-  mean(replicate(
-    run(f=f,n=500,prior = "geom",lambda = .4,M0 = 1,mu = 1,autoM0 = T),
-    n=100))
-})
+resutl <- parLapply(cl,nlist,positive)
 print(proc.time() - start.time)
 
-
-
+t(unlist(resutl))
